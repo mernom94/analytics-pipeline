@@ -1,4 +1,5 @@
 import asyncio
+import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -6,14 +7,20 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from app.core.config import get_settings
 from app.models.orm import Base
 
 config = context.config
-settings = get_settings()
 
-# Override with actual DB URL
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# Read DATABASE_URL directly from environment — avoids double-import of Settings
+database_url = os.environ.get("DATABASE_URL", config.get_main_option("sqlalchemy.url", ""))
+
+# Normalise URL scheme for asyncpg
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
+if database_url.startswith("postgresql://"):
+    database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+config.set_main_option("sqlalchemy.url", database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
