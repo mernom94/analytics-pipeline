@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: analytics-pipeline
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health/live
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: portfolio-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: portfolio-redis
+          property: connectionString
+      - key: WORKER_ID
+        value: analytics-api-1
+
+  - type: worker
+    name: rollup-worker
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python worker_rollup.py
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: portfolio-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: portfolio-redis
+          property: connectionString
+      - key: WORKER_ID
+        value: rollup-worker-1
