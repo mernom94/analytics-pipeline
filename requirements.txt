@@ -1,0 +1,26 @@
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+asyncpg==0.29.0
+sqlalchemy[asyncio]==2.0.30
+alembic==1.13.1
+redis[hiredis]==5.0.6
+pydantic==2.7.1
+pydantic-settings==2.3.0
+python-json-logger==2.0.7
+httpx==0.27.0
+orjson==3.10.3
+tenacity==8.3.0
+structlog==24.2.0
+# Prometheus metrics — /metrics scrape endpoint
+prometheus-client==0.20.0
+python-ulid==2.7.0
+anyio==4.4.0
+# OpenTelemetry OTLP tracing (optional — app degrades gracefully without these)
+opentelemetry-sdk==1.24.0
+opentelemetry-exporter-otlp-proto-grpc==1.24.0
+# Test dependencies
+pytest==8.2.2
+pytest-asyncio==0.24.0
+pytest-httpx==0.30.0
+faker==25.3.0
+asgi-lifespan==2.1.0
