@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -49,6 +50,16 @@ class Settings(BaseSettings):
     # OTLP gRPC endpoint for OpenTelemetry tracing (e.g. "http://otel-collector:4317").
     # Leave empty to disable tracing.
     otlp_endpoint: str = ""
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def fix_database_url(cls, v: str) -> str:
+        v = str(v)
+        if v.startswith("postgres://"):
+            v = v.replace("postgres://", "postgresql+asyncpg://", 1)
+        if v.startswith("postgresql://"):
+            v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
 
 
 @lru_cache
