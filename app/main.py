@@ -33,6 +33,10 @@ from app.observability import init_tracing, shutdown_tracing
 settings = get_settings()
 logger = get_logger(__name__)
 
+import os
+print("DATABASE_URL:", os.environ.get("DATABASE_URL", "NOT SET"))
+print("REDIS_URL:", os.environ.get("REDIS_URL", "NOT SET"))
+
 
 # ── Pure ASGI middleware — no BaseHTTPMiddleware, no background task leak ─────
 
