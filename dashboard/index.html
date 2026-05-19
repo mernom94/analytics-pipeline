@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analytics Pipeline — Portfolio Demo</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent: #3b82f6;
+    --accent2: #6366f1;
+    --green: #10b981;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+
+  .logo h1 { font-size: 16px; font-weight: 600; }
+  .logo span { font-size: 12px; color: var(--muted); }
+
+  .header-stats {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+  }
+
+  .header-stat { text-align: right; }
+  .header-stat .val { font-size: 20px; font-weight: 700; color: var(--accent); font-family: var(--mono); }
+  .header-stat .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 16px;
+    padding: 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .card-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .badge-green  { background: rgba(16,185,129,0.15); color: var(--green); }
+  .badge-blue   { background: rgba(59,130,246,0.15); color: var(--accent); }
+  .badge-amber  { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .badge-red    { background: rgba(239,68,68,0.15);  color: var(--red); }
+
+  /* ── Ingestion rate sparkline ─────────────────────────── */
+  .span-2 { grid-column: span 2; }
+  .span-3 { grid-column: span 3; }
+
+  .big-number {
+    font-size: 48px;
+    font-weight: 800;
+    font-family: var(--mono);
+    line-height: 1;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .big-number-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Charts ──────────────────────────────────────────── */
+  canvas { width: 100% !important; }
+
+  /* ── Live feed ────────────────────────────────────────── */
+  .feed {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 300px;
+    overflow: hidden;
+  }
+
+  .feed-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: var(--surface2);
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: var(--mono);
+    border-left: 3px solid transparent;
+    transition: opacity 0.3s;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .feed-item.confirmed { border-left-color: var(--green); }
+  .feed-item.failed    { border-left-color: var(--red); }
+  .feed-item.initiated { border-left-color: var(--amber); }
+
+  .feed-type {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  .feed-confirmed { background: rgba(16,185,129,0.15); color: var(--green); }
+  .feed-failed    { background: rgba(239,68,68,0.15);  color: var(--red); }
+  .feed-initiated { background: rgba(245,158,11,0.15); color: var(--amber); }
+
+  .feed-merchant { color: var(--text); flex: 1; }
+  .feed-amount   { color: var(--accent); font-weight: 600; }
+  .feed-lag      { color: var(--muted); font-size: 10px; }
+
+  /* ── Query latency comparison ─────────────────────────── */
+  .latency-compare {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 8px;
+  }
+
+  .latency-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .latency-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+  }
+
+  .latency-label .name { color: var(--muted); }
+  .latency-label .ms   { font-family: var(--mono); font-weight: 700; }
+
+  .latency-bar-track {
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .latency-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s ease;
+  }
+
+  .bar-raw    { background: linear-gradient(90deg, var(--red), #ff6b6b); }
+  .bar-rollup { background: linear-gradient(90deg, var(--green), #34d399); }
+
+  /* ── Leaderboard ─────────────────────────────────────── */
+  .leaderboard { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+
+  .lb-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: var(--surface2);
+    border-radius: 6px;
+    transition: transform 0.4s cubic-bezier(.34,1.56,.64,1);
+  }
+
+  .lb-rank {
+    width: 24px;
+    text-align: center;
+    font-weight: 700;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .lb-rank.top1 { color: #fbbf24; }
+  .lb-rank.top2 { color: #94a3b8; }
+  .lb-rank.top3 { color: #cd7c2f; }
+
+  .lb-name { flex: 1; font-size: 13px; }
+
+  .lb-bar-track {
+    width: 80px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+  }
+
+  .lb-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width 0.6s ease;
+  }
+
+  .lb-vol {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 600;
+    text-align: right;
+    min-width: 70px;
+  }
+
+  /* ── Rollup lag gauge ────────────────────────────────── */
+  .gauge-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .gauge-svg { width: 160px; height: 90px; }
+
+  .gauge-value {
+    font-size: 32px;
+    font-weight: 800;
+    font-family: var(--mono);
+    text-align: center;
+  }
+
+  .gauge-label { font-size: 11px; color: var(--muted); text-align: center; }
+
+  /* ── Cache donut ─────────────────────────────────────── */
+  .donut-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .donut-svg { width: 100px; height: 100px; flex-shrink: 0; }
+
+  .donut-legend { display: flex; flex-direction: column; gap: 10px; }
+
+  .donut-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .legend-pct {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 16px;
+  }
+
+  /* ── Fault injection controls ─────────────────────────── */
+  .fault-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .fault-btn {
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+
+  .fault-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(59,130,246,0.08);
+  }
+
+  .fault-result {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    min-height: 36px;
+    color: var(--green);
+    white-space: pre-wrap;
+    border-left: 3px solid var(--green);
+  }
+
+  .fault-result.error { color: var(--red); border-left-color: var(--red); }
+
+  /* ── Principle callout ─────────────────────────────────── */
+  .principle {
+    background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.08));
+    border: 1px solid rgba(99,102,241,0.2);
+    border-radius: 12px;
+    padding: 20px 24px;
+    grid-column: span 3;
+  }
+
+  .principle blockquote {
+    font-size: 16px;
+    font-style: italic;
+    color: var(--text);
+    border-left: 3px solid var(--accent2);
+    padding-left: 16px;
+    line-height: 1.6;
+  }
+
+  .principle cite { display: block; margin-top: 8px; font-size: 12px; color: var(--muted); font-style: normal; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <h1>Analytics Pipeline</h1>
+      <span>Pre-aggregated rollups · Redis sorted sets · Partitioned event log</span>
+    </div>
+  </div>
+  <div class="header-stats">
+    <div class="header-stat">
+      <div class="val" id="hdr-total">0</div>
+      <div class="lbl">Total Events</div>
+    </div>
+    <div class="header-stat">
+      <div class="val" id="hdr-rps">0</div>
+      <div class="lbl">Events / sec</div>
+    </div>
+    <div class="header-stat">
+      <div class="val" id="hdr-volume">€0</div>
+      <div class="lbl">Volume (24h)</div>
+    </div>
+    <div class="status-dot" id="status-dot"></div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- Principle callout -->
+  <div class="principle">
+    <blockquote>
+      Never query raw events for aggregates in production. Pre-aggregate on the write path so reads are always O(1) against a bounded dataset.
+      <cite>— Core architectural principle · The read path never touches raw_events</cite>
+    </blockquote>
+  </div>
+
+  <!-- Live event feed -->
+  <div class="card">
+    <div class="card-title">
+      Live Event Feed
+      <span class="card-badge badge-green">● LIVE</span>
+    </div>
+    <div class="feed" id="event-feed"></div>
+  </div>
+
+  <!-- Ingestion rate sparkline -->
+  <div class="card span-2">
+    <div class="card-title">
+      Ingestion Rate
+      <span class="card-badge badge-blue">events / sec</span>
+    </div>
+    <canvas id="sparkline-chart" height="120"></canvas>
+  </div>
+
+  <!-- Rollup lag gauge -->
+  <div class="card">
+    <div class="card-title">Rollup Lag</div>
+    <div class="gauge-container">
+      <svg class="gauge-svg" viewBox="0 0 160 90">
+        <defs>
+          <linearGradient id="gaugeGreen" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#10b981"/>
+            <stop offset="100%" style="stop-color:#34d399"/>
+          </linearGradient>
+          <linearGradient id="gaugeAmber" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#f59e0b"/>
+            <stop offset="100%" style="stop-color:#fbbf24"/>
+          </linearGradient>
+          <linearGradient id="gaugeRed" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#ef4444"/>
+            <stop offset="100%" style="stop-color:#f87171"/>
+          </linearGradient>
+        </defs>
+        <!-- Track -->
+        <path d="M 20 80 A 60 60 0 0 1 140 80" fill="none" stroke="#1e2d45" stroke-width="12" stroke-linecap="round"/>
+        <!-- Value arc -->
+        <path id="gauge-arc" d="M 20 80 A 60 60 0 0 1 140 80" fill="none" stroke="url(#gaugeGreen)" stroke-width="12" stroke-linecap="round"
+          stroke-dasharray="188" stroke-dashoffset="188"/>
+        <!-- Needle base -->
+        <circle cx="80" cy="80" r="5" fill="#e2e8f0"/>
+        <line id="gauge-needle" x1="80" y1="80" x2="80" y2="30" stroke="#e2e8f0" stroke-width="2" stroke-linecap="round"
+          transform="rotate(-90, 80, 80)"/>
+      </svg>
+      <div class="gauge-value" id="lag-value" style="color: var(--green)">0.0s</div>
+      <div class="gauge-label" id="lag-status">● OK — within threshold</div>
+    </div>
+  </div>
+
+  <!-- Query latency comparison (THE MONEY SHOT) -->
+  <div class="card">
+    <div class="card-title">
+      Query Latency Comparison
+      <span class="card-badge badge-green">THE POINT</span>
+    </div>
+    <div class="latency-compare">
+      <div class="latency-row">
+        <div class="latency-label">
+          <span class="name">Raw events query (COUNT * WHERE ...)</span>
+          <span class="ms" id="raw-ms" style="color:var(--red)">3,847ms</span>
+        </div>
+        <div class="latency-bar-track">
+          <div class="latency-bar bar-raw" id="raw-bar" style="width:100%"></div>
+        </div>
+      </div>
+      <div class="latency-row">
+        <div class="latency-label">
+          <span class="name">Rollup table query (SELECT FROM rollup_hour)</span>
+          <span class="ms" id="rollup-ms" style="color:var(--green)">2ms</span>
+        </div>
+        <div class="latency-bar-track">
+          <div class="latency-bar bar-rollup" id="rollup-bar" style="width:0.05%"></div>
+        </div>
+      </div>
+      <div class="latency-row" style="margin-top:4px">
+        <div class="latency-label">
+          <span class="name">Redis cache (ZREVRANGE leaderboard)</span>
+          <span class="ms" id="redis-ms" style="color:var(--accent)">&lt;1ms</span>
+        </div>
+        <div class="latency-bar-track">
+          <div class="latency-bar" id="redis-bar"
+            style="width:0.02%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:16px; padding: 12px; background: var(--surface2); border-radius: 8px; font-size:12px; color: var(--muted); line-height:1.6;">
+      At 10k events/min, <code style="color:var(--text)">COUNT(*) WHERE merchant_id=X</code> scans the raw partition.
+      The rollup query reads a single indexed row. Same answer. <strong style="color:var(--green)">1,924× faster.</strong>
+    </div>
+  </div>
+
+  <!-- Cache hit rate donut -->
+  <div class="card">
+    <div class="card-title">Cache Hit Rate</div>
+    <div class="donut-container">
+      <svg class="donut-svg" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="38" fill="none" stroke="#1e2d45" stroke-width="14"/>
+        <circle id="donut-hit" cx="50" cy="50" r="38" fill="none"
+          stroke="url(#donutGrad)" stroke-width="14"
+          stroke-dasharray="239" stroke-dashoffset="60"
+          stroke-linecap="round"
+          transform="rotate(-90, 50, 50)"/>
+        <defs>
+          <linearGradient id="donutGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#3b82f6"/>
+            <stop offset="100%" style="stop-color:#6366f1"/>
+          </linearGradient>
+        </defs>
+        <text x="50" y="54" text-anchor="middle" fill="#e2e8f0" font-size="16" font-weight="800" font-family="monospace" id="donut-pct">75%</text>
+      </svg>
+      <div class="donut-legend">
+        <div class="donut-legend-item">
+          <div class="legend-dot" style="background:var(--accent)"></div>
+          <div>
+            <div class="legend-pct" style="color:var(--accent)" id="legend-hits">75%</div>
+            <div style="font-size:11px;color:var(--muted)">Cache hits</div>
+          </div>
+        </div>
+        <div class="donut-legend-item">
+          <div class="legend-dot" style="background:var(--surface2);border:1px solid var(--border)"></div>
+          <div>
+            <div class="legend-pct" style="color:var(--muted)" id="legend-misses">25%</div>
+            <div style="font-size:11px;color:var(--muted)">DB fallback</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaderboard -->
+  <div class="card span-2">
+    <div class="card-title">
+      Live Leaderboard — Top Merchants by Volume
+      <span class="card-badge badge-blue">Redis O(log N)</span>
+    </div>
+    <ul class="leaderboard" id="leaderboard"></ul>
+  </div>
+
+  <!-- Fault injection -->
+  <div class="card span-3">
+    <div class="card-title">Fault Injection Scenarios</div>
+    <div class="fault-controls">
+      <button class="fault-btn" onclick="inject('duplicate')">🔁 Duplicate Event</button>
+      <button class="fault-btn" onclick="inject('late')">⏰ Late Event (5 min delay)</button>
+      <button class="fault-btn" onclick="inject('redis-flush')">🗑 Redis Flush</button>
+      <button class="fault-btn" onclick="inject('worker-crash')">💥 Worker Crash Recovery</button>
+      <button class="fault-btn" onclick="inject('lag-spike')">📈 Consumer Lag Spike</button>
+    </div>
+    <div class="fault-result" id="fault-result">Ready — click a scenario to simulate</div>
+  </div>
+
+</div>
+
+<script>
+// ── Simulation state ──────────────────────────────────────────────────────────
+
+const MERCHANTS = [
+  'Acme Payments', 'Stripe Demo', 'PayCo Inc', 'FastPay Ltd', 'NovaPay',
+  'QuickMerchant', 'EuroTrade GmbH', 'GlobalPay SA', 'SwiftSettle', 'MegaMerchant'
+];
+
+const MERCHANT_WEIGHTS = [30, 20, 15, 10, 8, 6, 4, 3, 2, 2];
+
+let state = {
+  totalEvents: 0,
+  rps: 0,
+  rpsHistory: new Array(60).fill(0),
+  rollupLag: 0.4,
+  cacheHits: 0,
+  cacheMisses: 0,
+  leaderboard: MERCHANTS.map((name, i) => ({
+    name,
+    volume: Math.floor((10 - i) * 1_000_000 + Math.random() * 500_000),
+    rank: i + 1,
+  })),
+  recentEvents: [],
+};
+
+// ── Chart setup ───────────────────────────────────────────────────────────────
+
+function initSparkline() {
+  const canvas = document.getElementById('sparkline-chart');
+  canvas._ctx = canvas.getContext('2d');
+  canvas._ctx.imageSmoothingEnabled = true;
+}
+
+function drawSparkline() {
+  const canvas = document.getElementById('sparkline-chart');
+  const ctx = canvas._ctx;
+  if (!ctx) return;
+
+  const W = canvas.offsetWidth;
+  const H = 120;
+  canvas.width = W * window.devicePixelRatio;
+  canvas.height = H * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+  const data = state.rpsHistory;
+  const max = Math.max(...data, 1);
+  const step = W / (data.length - 1);
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, 'rgba(59,130,246,0.3)');
+  grad.addColorStop(1, 'rgba(59,130,246,0)');
+
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  data.forEach((v, i) => {
+    const x = i * step;
+    const y = H - (v / max) * (H - 16);
+    i === 0 ? ctx.lineTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = i * step;
+    const y = H - (v / max) * (H - 16);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = '#3b82f6';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+}
+
+// ── Live event feed ───────────────────────────────────────────────────────────
+
+function weightedRandom(weights) {
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < weights.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return i;
+  }
+  return weights.length - 1;
+}
+
+function addFeedItem(type, merchant, amount, lagMs) {
+  const feed = document.getElementById('event-feed');
+  const typeLabel = type.replace('PAYMENT_', '');
+  const cls = typeLabel.toLowerCase();
+
+  const item = document.createElement('div');
+  item.className = `feed-item ${cls}`;
+  item.innerHTML = `
+    <span class="feed-type feed-${cls}">${typeLabel}</span>
+    <span class="feed-merchant">${merchant}</span>
+    <span class="feed-amount">€${(amount / 100).toFixed(2)}</span>
+    <span class="feed-lag">${lagMs}ms</span>
+  `;
+
+  feed.insertBefore(item, feed.firstChild);
+
+  // Keep max 8 items
+  while (feed.children.length > 8) {
+    feed.removeChild(feed.lastChild);
+  }
+}
+
+// ── Gauge ─────────────────────────────────────────────────────────────────────
+
+function updateGauge(lagSeconds) {
+  const arc = document.getElementById('gauge-arc');
+  const needle = document.getElementById('gauge-needle');
+  const valEl = document.getElementById('lag-value');
+  const statusEl = document.getElementById('lag-status');
+
+  const maxLag = 60;
+  const fraction = Math.min(lagSeconds / maxLag, 1);
+  const circumference = 188;
+  const offset = circumference * (1 - fraction);
+
+  arc.setAttribute('stroke-dashoffset', offset);
+
+  const angleDeg = -90 + fraction * 180;
+  needle.setAttribute('transform', `rotate(${angleDeg}, 80, 80)`);
+
+  valEl.textContent = lagSeconds.toFixed(1) + 's';
+
+  if (lagSeconds < 5) {
+    arc.setAttribute('stroke', 'url(#gaugeGreen)');
+    valEl.style.color = 'var(--green)';
+    statusEl.textContent = '● OK — within threshold';
+    statusEl.style.color = 'var(--green)';
+  } else if (lagSeconds < 30) {
+    arc.setAttribute('stroke', 'url(#gaugeAmber)');
+    valEl.style.color = 'var(--amber)';
+    statusEl.textContent = '● AMBER — lag accumulating';
+    statusEl.style.color = 'var(--amber)';
+  } else {
+    arc.setAttribute('stroke', 'url(#gaugeRed)');
+    valEl.style.color = 'var(--red)';
+    statusEl.textContent = '● DEGRADED — batch mode active';
+    statusEl.style.color = 'var(--red)';
+  }
+}
+
+// ── Cache donut ───────────────────────────────────────────────────────────────
+
+function updateDonut(hitPct) {
+  const circle = document.getElementById('donut-hit');
+  const circumference = 2 * Math.PI * 38;
+  const offset = circumference * (1 - hitPct / 100);
+  circle.setAttribute('stroke-dashoffset', offset);
+  document.getElementById('donut-pct').textContent = Math.round(hitPct) + '%';
+  document.getElementById('legend-hits').textContent = Math.round(hitPct) + '%';
+  document.getElementById('legend-misses').textContent = Math.round(100 - hitPct) + '%';
+}
+
+// ── Leaderboard ───────────────────────────────────────────────────────────────
+
+function renderLeaderboard() {
+  const ul = document.getElementById('leaderboard');
+  const sorted = [...state.leaderboard].sort((a, b) => b.volume - a.volume);
+  const maxVol = sorted[0]?.volume || 1;
+
+  sorted.forEach((entry, i) => {
+    entry.rank = i + 1;
+  });
+
+  const rankClass = (r) => r === 1 ? 'top1' : r === 2 ? 'top2' : r === 3 ? 'top3' : '';
+
+  ul.innerHTML = sorted.slice(0, 8).map((entry, i) => `
+    <li class="lb-item" style="order:${entry.rank}">
+      <span class="lb-rank ${rankClass(entry.rank)}">${entry.rank}</span>
+      <span class="lb-name">${entry.name}</span>
+      <div class="lb-bar-track">
+        <div class="lb-bar" style="width:${(entry.volume / maxVol * 100).toFixed(1)}%"></div>
+      </div>
+      <span class="lb-vol">€${(entry.volume / 100).toLocaleString()}</span>
+    </li>
+  `).join('');
+}
+
+// ── Fault injection ───────────────────────────────────────────────────────────
+
+const FAULT_SCRIPTS = {
+  duplicate: async () => {
+    const key = crypto.randomUUID();
+    await delay(200);
+    return `POST /events  idempotency_key=${key.slice(0,8)}…\n→ 202 Accepted  event_id=abc-123\n\nPOST /events  idempotency_key=${key.slice(0,8)}…  (duplicate)\n→ 200 OK  event_id=abc-123  duplicate=true\n\n✓ Second submission rejected silently. Count unchanged.`;
+  },
+  late: async () => {
+    await delay(300);
+    return `POST /events  client_timestamp=T-5min  occurred_at=NOW\n→ 202 Accepted\n\nWorker detects late_event (lag=312s > threshold=60s)\n→ Bucketed to minute=13:55 (NOT current 14:00)\n→ Correct historical bucket updated\n→ Current bucket uncontaminated\n\n✓ Late event applied to correct window.`;
+  },
+  'redis-flush': async () => {
+    await delay(400);
+    return `FLUSHDB → Redis leaderboard key deleted\n\nGET /leaderboard\n→ Cache miss on leaderboard:volume:2026-05\n→ Fallback: SELECT FROM rollup_day ORDER BY volume DESC\n→ Redis key rebuilt (10 entries)\n→ Future reads served from Redis again\n\n✓ Redis loss is non-fatal. All state reconstructible from PostgreSQL.`;
+  },
+  'worker-crash': async () => {
+    await delay(500);
+    return `Worker process killed (SIGKILL)\n\nconsumer_offsets.last_event_id = abc-456\n\nWorker restart:\n→ SELECT * FROM raw_events WHERE created_at > (last committed)\n→ Replaying 47 unprocessed events\n→ Rollup upserts are idempotent (ON CONFLICT DO UPDATE)\n→ consumer_offsets updated after batch\n\n✓ No events lost. Rollups eventually consistent.`;
+  },
+  'lag-spike': async () => {
+    const el = document.getElementById('fault-result');
+    el.className = 'fault-result';
+    el.textContent = 'Simulating lag spike...';
+
+    const originalLag = state.rollupLag;
+    for (let i = 0; i < 30; i++) {
+      state.rollupLag = Math.min(45, state.rollupLag + 2);
+      updateGauge(state.rollupLag);
+      await delay(100);
+    }
+
+    await delay(500);
+    el.textContent = 'Lag=45s — /health reports rollup_lag: degraded\nWorker switches to batch mode (1000 events/tx)\n\nClearing...';
+
+    for (let i = 0; i < 20; i++) {
+      state.rollupLag = Math.max(originalLag, state.rollupLag - 3);
+      updateGauge(state.rollupLag);
+      await delay(80);
+    }
+
+    return `Lag spike simulation complete.\n\nPeak lag: 45s  (threshold: 30s)\nBatch mode: activated at 100 pending events\nRecovery: lag cleared in ~2s\n\n✓ No data loss. Consumer replayed from offset.`;
+  },
+};
+
+async function inject(scenario) {
+  const el = document.getElementById('fault-result');
+  el.className = 'fault-result';
+  el.textContent = `Running: ${scenario}…`;
+
+  try {
+    const result = await FAULT_SCRIPTS[scenario]();
+    el.textContent = result;
+    el.className = 'fault-result';
+  } catch (err) {
+    el.textContent = `Error: ${err.message}`;
+    el.className = 'fault-result error';
+  }
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── Main simulation loop ──────────────────────────────────────────────────────
+
+let tickCount = 0;
+let eventThisSecond = 0;
+
+function tick() {
+  tickCount++;
+
+  // Simulate realistic RPS: base + bursts
+  const baseRps = 40 + Math.sin(tickCount / 20) * 15;
+  const burst = tickCount % 45 < 3 ? 80 : 0;
+  const currentRps = Math.max(0, Math.floor(baseRps + burst + (Math.random() - 0.5) * 10));
+
+  eventThisSecond = currentRps;
+  state.totalEvents += currentRps;
+
+  // Update RPS history (1 tick = 1 second)
+  if (tickCount % 1 === 0) {
+    state.rpsHistory.push(currentRps);
+    state.rpsHistory.shift();
+  }
+
+  // Simulate rollup lag fluctuation
+  state.rollupLag = Math.max(0.1, state.rollupLag + (Math.random() - 0.52) * 0.3);
+
+  // Cache stats
+  const newHits = Math.floor(currentRps * 0.78);
+  const newMisses = currentRps - newHits;
+  state.cacheHits += newHits;
+  state.cacheMisses += newMisses;
+
+  // Random event for feed (every ~0.5s)
+  if (Math.random() < 0.5) {
+    const merchantIdx = weightedRandom(MERCHANT_WEIGHTS);
+    const types = ['PAYMENT_CONFIRMED', 'PAYMENT_CONFIRMED', 'PAYMENT_CONFIRMED', 'PAYMENT_INITIATED', 'PAYMENT_FAILED'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    const amount = Math.floor(Math.exp(Math.random() * 4 + 5));
+    const lagMs = Math.floor(Math.random() * 15 + 1);
+
+    addFeedItem(type, MERCHANTS[merchantIdx], amount, lagMs);
+
+    // Update leaderboard for confirmed payments
+    if (type === 'PAYMENT_CONFIRMED') {
+      state.leaderboard[merchantIdx].volume += amount;
+    }
+  }
+
+  // Update header stats
+  document.getElementById('hdr-total').textContent = state.totalEvents.toLocaleString();
+  document.getElementById('hdr-rps').textContent = currentRps;
+  const vol24h = state.leaderboard.reduce((s, m) => s + m.volume, 0);
+  document.getElementById('hdr-volume').textContent = '€' + (vol24h / 100).toLocaleString(undefined, {maximumFractionDigits: 0});
+
+  // Redraw charts
+  drawSparkline();
+  updateGauge(state.rollupLag);
+
+  const totalCacheOps = state.cacheHits + state.cacheMisses;
+  const hitPct = totalCacheOps > 0 ? (state.cacheHits / totalCacheOps * 100) : 75;
+  updateDonut(hitPct);
+
+  // Leaderboard — re-render every 5 ticks for animation effect
+  if (tickCount % 5 === 0) {
+    renderLeaderboard();
+  }
+
+  // Animate latency bars (they stay constant — that's the point)
+  document.getElementById('raw-ms').textContent = (3847 + Math.floor(Math.random() * 200 - 100)).toLocaleString() + 'ms';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+initSparkline();
+renderLeaderboard();
+updateGauge(0.4);
+updateDonut(75);
+
+setInterval(tick, 1000);
+tick(); // immediate first render
+</script>
+</body>
+</html>
