@@ -7,13 +7,13 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Database
-    database_url: str = "postgresql+asyncpg://analytics:analytics@localhost:5432/analytics"
+    database_url: str 
     db_pool_size: int = 20
     db_max_overflow: int = 10
     db_pool_timeout: int = 30
 
     # Redis
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str 
     redis_pool_size: int = 20
 
     # Worker
