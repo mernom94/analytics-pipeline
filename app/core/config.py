@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     # Leave empty to disable tracing.
     otlp_endpoint: str = ""
 
-    @field_validator("DATABASE_URL", mode="before")
+    @field_validator("database_url", mode="before")
     @classmethod
     def fix_database_url(cls, v: str) -> str:
         v = str(v)
